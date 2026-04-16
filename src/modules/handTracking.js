@@ -1,4 +1,4 @@
-// Using global MediaPipe from CDN (added in index.html) to avoid Vite bundling issues
+// Using global MediaPipe from CDN
 const getHandsConstructor = () => {
   if (typeof window !== 'undefined' && window.Hands) return window.Hands;
   return null;
@@ -8,7 +8,7 @@ export class HandTracker {
   constructor(onResults) {
     const HandsConstructor = getHandsConstructor();
     if (!HandsConstructor) {
-      console.error('MediaPipe Hands not found. Ensure @mediapipe/hands is installed or CDN is loaded.');
+      console.error('MediaPipe Hands not found.');
       throw new Error('MediaPipe Hands not found');
     }
 
@@ -21,11 +21,18 @@ export class HandTracker {
     this.hands.setOptions({
       maxNumHands: 2,
       modelComplexity: 1,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      minDetectionConfidence: 0.7,   // 🔥 increased
+      minTrackingConfidence: 0.7,    // 🔥 increased
     });
 
-    this.hands.onResults(onResults);
+    this.hands.onResults((results) => {
+      // 🔥 IMPORTANT FIX → ignore noise
+      if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        return;
+      }
+
+      onResults(results);
+    });
   }
 
   async send(image) {
@@ -40,9 +47,6 @@ export class HandTracker {
   }
 
   static isFingerUp(landmarks, fingerIndex) {
-    // MediaPipe Hand Landmarks: 
-    // Thumb: 4, Index: 8, Middle: 12, Ring: 16, Pinky: 20
-    // Tip is further up (y is smaller) than the PIP joint (tip-2)
     const tip = landmarks[fingerIndex * 4 + 4];
     const pip = landmarks[fingerIndex * 4 + 2];
     return tip.y < pip.y;
